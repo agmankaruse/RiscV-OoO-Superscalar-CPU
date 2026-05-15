@@ -1,0 +1,7 @@
+# RAW dependencies plus a false dependency on x1.
+ADDI x1, x0, 1
+ADDI x2, x0, 2
+ADD  x1, x1, x2
+ADD  x3, x1, x2
+ADDI x1, x0, 9
+ADD  x4, x3, x2

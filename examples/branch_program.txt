@@ -1,0 +1,8 @@
+# Static not-taken predictor will mispredict the taken BEQ.
+ADDI x1, x0, 5
+ADDI x2, x0, 5
+BEQ  x1, x2, target
+ADDI x3, x0, 99
+target:
+ADDI x3, x0, 7
+ADD  x4, x3, x1

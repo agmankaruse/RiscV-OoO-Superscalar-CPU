@@ -1,0 +1,5 @@
+# Store-to-load forwarding through the load/store queue.
+ADDI x1, x0, 42
+SW   x1, 0(x0)
+LW   x2, 0(x0)
+ADDI x3, x2, 1
