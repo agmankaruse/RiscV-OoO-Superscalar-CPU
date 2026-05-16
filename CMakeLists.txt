@@ -12,6 +12,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_library(riscv_ooo_core
     src/branch_predictor.cpp
+    src/cache.cpp
+    src/config.cpp
     src/cpu.cpp
     src/functional_unit.cpp
     src/isa.cpp
@@ -44,7 +46,12 @@ set(RISCV_OOO_TESTS
     test_out_of_order
     test_load_store
     test_branch
+    test_branch_predictor
+    test_cache
+    test_config
     test_x0
+    test_rv32m
+    test_timeline
 )
 
 foreach(test_name IN LISTS RISCV_OOO_TESTS)

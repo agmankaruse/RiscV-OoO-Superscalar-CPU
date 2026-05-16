@@ -24,7 +24,7 @@ void FunctionalUnit::issue(const IssuedOperation& operation) {
         throw std::runtime_error("functional unit already busy");
     }
     operation_ = operation;
-    remainingCycles_ = latencyCycles_;
+    remainingCycles_ = operation.latencyCycles > 0 ? operation.latencyCycles : latencyCycles_;
 }
 
 std::optional<IssuedOperation> FunctionalUnit::tick() {

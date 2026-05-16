@@ -1,0 +1,9 @@
+# Independent ALU work. A wide issue machine can exploit this.
+ADDI x1, x0, 1
+ADDI x2, x0, 2
+ADDI x3, x0, 3
+ADDI x4, x0, 4
+ADD  x5, x1, x2
+ADD  x6, x3, x4
+XOR  x7, x5, x6
+OR   x8, x1, x7

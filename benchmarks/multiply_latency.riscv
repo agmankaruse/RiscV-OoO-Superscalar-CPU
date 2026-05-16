@@ -1,0 +1,7 @@
+# RV32M multi-cycle multiply/divide behavior.
+ADDI x1, x0, 6
+ADDI x2, x0, 7
+MUL  x3, x1, x2
+DIV  x4, x3, x1
+REM  x5, x3, x2
+ADD  x6, x4, x5

@@ -1,0 +1,9 @@
+# Long RAW dependency chain. OoO cannot extract much ILP here.
+ADDI x1, x0, 1
+ADDI x2, x1, 1
+ADDI x3, x2, 1
+ADDI x4, x3, 1
+ADDI x5, x4, 1
+ADDI x6, x5, 1
+ADDI x7, x6, 1
+ADDI x8, x7, 1

@@ -21,6 +21,7 @@ struct IssuedOperation {
     std::uint32_t effectiveAddress = 0;
     bool hasForwardedLoadValue = false;
     std::uint32_t forwardedLoadValue = 0;
+    int latencyCycles = 1;
 };
 
 class FunctionalUnit {

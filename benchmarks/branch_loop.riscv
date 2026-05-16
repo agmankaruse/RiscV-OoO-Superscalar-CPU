@@ -1,0 +1,8 @@
+# Repeated taken backward branch. Dynamic predictors should warm up.
+ADDI x1, x0, 5
+ADDI x2, x0, 0
+loop:
+ADDI x2, x2, 1
+ADDI x1, x1, -1
+BNE  x1, x0, loop
+ADD  x3, x2, x0

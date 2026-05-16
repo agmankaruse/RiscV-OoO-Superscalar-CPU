@@ -14,6 +14,10 @@ enum class Opcode {
     SLL,
     SRL,
     SRA,
+    MUL,
+    MULH,
+    DIV,
+    REM,
     ADDI,
     ANDI,
     ORI,
@@ -38,7 +42,9 @@ struct Instruction {
     int rs2 = -1;
     std::int32_t imm = 0;
     int target = -1;
+    int predictedNextPc = -1;
     std::uint32_t pc = 0;
+    std::uint64_t dynamicId = 0;
     std::string text;
 
     bool usesRs1() const;
@@ -47,6 +53,7 @@ struct Instruction {
     bool isLoad() const;
     bool isStore() const;
     bool isMemory() const;
+    bool isMultiplyDivide() const;
     bool isBranch() const;
     bool isJump() const;
     bool isControl() const;

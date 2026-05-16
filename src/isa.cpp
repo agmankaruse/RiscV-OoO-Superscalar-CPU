@@ -100,6 +100,10 @@ Opcode parseOpcode(const std::string& token) {
     if (op == "SLL") return Opcode::SLL;
     if (op == "SRL") return Opcode::SRL;
     if (op == "SRA") return Opcode::SRA;
+    if (op == "MUL") return Opcode::MUL;
+    if (op == "MULH") return Opcode::MULH;
+    if (op == "DIV") return Opcode::DIV;
+    if (op == "REM") return Opcode::REM;
     if (op == "ADDI") return Opcode::ADDI;
     if (op == "ANDI") return Opcode::ANDI;
     if (op == "ORI") return Opcode::ORI;
@@ -140,6 +144,10 @@ Instruction parseInstructionLine(const std::string& line,
     case Opcode::SLL:
     case Opcode::SRL:
     case Opcode::SRA:
+    case Opcode::MUL:
+    case Opcode::MULH:
+    case Opcode::DIV:
+    case Opcode::REM:
         requireCount(tokens, 4, tokens[0]);
         instruction.rd = parseRegister(tokens[1]);
         instruction.rs1 = parseRegister(tokens[2]);
@@ -217,6 +225,10 @@ bool Instruction::usesRs1() const {
     case Opcode::SLL:
     case Opcode::SRL:
     case Opcode::SRA:
+    case Opcode::MUL:
+    case Opcode::MULH:
+    case Opcode::DIV:
+    case Opcode::REM:
     case Opcode::ADDI:
     case Opcode::ANDI:
     case Opcode::ORI:
@@ -248,6 +260,10 @@ bool Instruction::usesRs2() const {
     case Opcode::SLL:
     case Opcode::SRL:
     case Opcode::SRA:
+    case Opcode::MUL:
+    case Opcode::MULH:
+    case Opcode::DIV:
+    case Opcode::REM:
     case Opcode::SW:
     case Opcode::BEQ:
     case Opcode::BNE:
@@ -269,6 +285,10 @@ bool Instruction::writesRegister() const {
     case Opcode::SLL:
     case Opcode::SRL:
     case Opcode::SRA:
+    case Opcode::MUL:
+    case Opcode::MULH:
+    case Opcode::DIV:
+    case Opcode::REM:
     case Opcode::ADDI:
     case Opcode::ANDI:
     case Opcode::ORI:
@@ -302,6 +322,10 @@ bool Instruction::isMemory() const {
     return isLoad() || isStore();
 }
 
+bool Instruction::isMultiplyDivide() const {
+    return op == Opcode::MUL || op == Opcode::MULH || op == Opcode::DIV || op == Opcode::REM;
+}
+
 bool Instruction::isBranch() const {
     return op == Opcode::BEQ || op == Opcode::BNE || op == Opcode::BLT || op == Opcode::BGE;
 }
@@ -324,6 +348,10 @@ std::string opcodeName(Opcode op) {
     case Opcode::SLL: return "SLL";
     case Opcode::SRL: return "SRL";
     case Opcode::SRA: return "SRA";
+    case Opcode::MUL: return "MUL";
+    case Opcode::MULH: return "MULH";
+    case Opcode::DIV: return "DIV";
+    case Opcode::REM: return "REM";
     case Opcode::ADDI: return "ADDI";
     case Opcode::ANDI: return "ANDI";
     case Opcode::ORI: return "ORI";
