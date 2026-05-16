@@ -1,6 +1,8 @@
 #pragma once
 
 #include "branch_predictor.hpp"
+#include "cache.hpp"
+#include "config.hpp"
 #include "functional_unit.hpp"
 #include "issue_queue.hpp"
 #include "load_store_queue.hpp"
@@ -18,19 +20,6 @@
 
 namespace ooo {
 
-struct CpuConfig {
-    int fetchWidth = 2;
-    int decodeWidth = 2;
-    int renameWidth = 2;
-    int dispatchWidth = 2;
-    int commitWidth = 2;
-
-    std::size_t robEntries = 32;
-    std::size_t issueQueueEntries = 16;
-    std::size_t loadStoreQueueEntries = 16;
-    int physicalRegisters = 64;
-};
-
 class CPU {
 public:
     explicit CPU(const CpuConfig& config = CpuConfig{});
@@ -41,6 +30,8 @@ public:
     void loadProgramFromFile(const std::string& path);
 
     void setTrace(bool enabled);
+    void enableTimelineCsv(const std::string& path);
+    void enableStatsCsv(const std::string& path);
     void tick();
     void run(std::size_t maxCycles = 100000);
 
@@ -62,16 +53,28 @@ private:
 
     bool operandsReady(const IssueEntry& entry) const;
     IssuedOperation buildIssuedOperation(const IssueEntry& entry, const LoadIssueInfo* loadInfo = nullptr) const;
+    int latencyFor(const Instruction& instruction) const;
     void completeOperation(const IssuedOperation& operation);
     void recoverFromBranch(std::uint64_t robId, int actualNextPc);
     void rebuildFreeListAfterRecovery();
+    void configureOutputFile(const std::string& path, const std::string& header);
+    void recordTimeline(const Instruction& instruction,
+                        const std::string& stage,
+                        const std::string& event,
+                        std::uint64_t robId = 0,
+                        int physicalDestination = -1);
+    void recordStatsCsvRow();
     void trace(const std::string& message) const;
 
     CpuConfig config_;
     std::vector<Instruction> program_;
     std::size_t fetchPc_ = 0;
+    int fetchStallCycles_ = 0;
     std::uint64_t nextRobId_ = 1;
+    std::uint64_t nextDynamicInstructionId_ = 1;
     bool traceEnabled_ = false;
+    std::string timelineCsvPath_;
+    std::string statsCsvPath_;
 
     PipelineQueues pipeline_;
     RenameTable renameTable_;
@@ -80,6 +83,8 @@ private:
     IssueQueue issueQueue_;
     LoadStoreQueue loadStoreQueue_;
     BranchPredictor branchPredictor_;
+    DirectMappedCache instructionCache_;
+    DirectMappedCache dataCache_;
     Memory memory_;
     Stats stats_;
 
