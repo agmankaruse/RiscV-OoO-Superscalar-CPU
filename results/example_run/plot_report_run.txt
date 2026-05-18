@@ -1,0 +1,7 @@
+wrote C:\Users\amank\OneDrive\Desktop\ProfessionalWork\Projects\RiscV-OoO-Superscalar-CPU\outputs\plots\cpu_ipc.png
+wrote C:\Users\amank\OneDrive\Desktop\ProfessionalWork\Projects\RiscV-OoO-Superscalar-CPU\outputs\plots\cpu_branch_accuracy.png
+wrote C:\Users\amank\OneDrive\Desktop\ProfessionalWork\Projects\RiscV-OoO-Superscalar-CPU\outputs\plots\cpu_cache_stalls.png
+wrote C:\Users\amank\OneDrive\Desktop\ProfessionalWork\Projects\RiscV-OoO-Superscalar-CPU\outputs\plots\cpu_rob_occupancy.png
+wrote C:\Users\amank\OneDrive\Desktop\ProfessionalWork\Projects\RiscV-OoO-Superscalar-CPU\outputs\plots\cpu_iq_occupancy.png
+wrote C:\Users\amank\OneDrive\Desktop\ProfessionalWork\Projects\RiscV-OoO-Superscalar-CPU\outputs\plots\cpu_lsq_occupancy.png
+wrote C:\Users\amank\OneDrive\Desktop\ProfessionalWork\Projects\RiscV-OoO-Superscalar-CPU\outputs\plots\cpu_benchmark_report.txt

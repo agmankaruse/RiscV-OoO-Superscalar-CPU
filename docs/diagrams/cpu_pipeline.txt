@@ -1,0 +1,5 @@
+Fetch -> Decode -> Rename -> Dispatch -> Issue -> Execute -> Writeback -> Commit
+  |        |         |          |        |         |           |          |
+ I$     parser   RAT/PRF      ROB/IQ    FU      latency      PRF       Arch
+                    |          LSQ       |                     |
+                    +------ branch snapshot / recovery --------+

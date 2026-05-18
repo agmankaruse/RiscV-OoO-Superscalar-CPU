@@ -1,0 +1,64 @@
+#!/usr/bin/env python3
+import argparse
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+import random_program_generator
+
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def default_simulator():
+    names = ["riscv_ooo_sim.exe", "riscv_ooo_sim"]
+    dirs = [ROOT / "build", ROOT / "build" / "Debug", ROOT / "build" / "Release"]
+    for directory in dirs:
+        for name in names:
+            candidate = directory / name
+            if candidate.exists():
+                return candidate
+    return ROOT / "build" / names[0]
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Run randomized differential tests.")
+    parser.add_argument("--count", type=int, default=20)
+    parser.add_argument("--instructions", type=int, default=100)
+    parser.add_argument("--seed", type=int, default=1)
+    parser.add_argument("--sim", default=str(default_simulator()))
+    args = parser.parse_args()
+
+    generated = ROOT / "generated"
+    failures = generated / "failures"
+    generated.mkdir(exist_ok=True)
+    failures.mkdir(parents=True, exist_ok=True)
+
+    passed = 0
+    failed = 0
+    for index in range(args.count):
+        seed = args.seed + index
+        program = generated / f"random_{seed}.riscv"
+        program.write_text(random_program_generator.generate(args.instructions, seed), encoding="utf-8")
+        completed = subprocess.run(
+            [args.sim, "--diff", str(program)],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+        )
+        if completed.returncode == 0 and "PASS" in completed.stdout:
+            passed += 1
+        else:
+            failed += 1
+            shutil.copy2(program, failures / program.name)
+            (failures / f"{program.stem}.log").write_text(completed.stdout, encoding="utf-8")
+            print(f"FAIL seed={seed} saved={failures / program.name}")
+
+    print(f"random_diff passed={passed} failed={failed} count={args.count}")
+    return 0 if failed == 0 else 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 namespace ooo {
 
@@ -14,6 +16,8 @@ public:
 
     std::uint32_t readWord(std::uint32_t address) const;
     void writeWord(std::uint32_t address, std::uint32_t value);
+
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> words() const;
 
     void clear();
 

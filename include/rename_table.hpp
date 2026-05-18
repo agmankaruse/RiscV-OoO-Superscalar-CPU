@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <deque>
 #include <set>
+#include <vector>
 
 namespace ooo {
 
@@ -33,6 +34,8 @@ public:
 
     bool canAllocate() const;
     std::size_t freeCount() const;
+    int physicalRegisterCount() const;
+    std::vector<int> freeListSnapshot() const;
     RenameResult allocateDestination(int architecturalRegister, PhysicalRegisterFile& registerFile);
 
     void commit(int architecturalRegister, int physicalRegister);

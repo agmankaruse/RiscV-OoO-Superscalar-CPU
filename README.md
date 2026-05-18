@@ -1,260 +1,134 @@
-# RiscV-OoO-Superscalar-CPU
+# RISC-V Out-of-Order Superscalar CPU Simulator
 
-An educational C++17 simulator for a RISC-V out-of-order superscalar CPU. This is a cycle-accurate-style architecture model, not a hardware implementation and not a plain instruction interpreter. The simulator is designed to make modern CPU concepts visible: superscalar fetch/decode, register renaming, out-of-order issue, multiple functional units, branch prediction, cache stalls, ROB retirement, load/store ordering, and timeline traces for visualization.
+A C++17 cycle-level RISC-V CPU simulator focused on the core mechanisms behind modern out-of-order execution: register renaming, physical registers, reorder-buffer retirement, issue queues, load/store ordering, branch prediction and recovery, cache stalls, timeline tracing, and differential verification.
 
-## Why This Is More Than a Toy Emulator
+This is a portfolio-oriented computer architecture project. It is intentionally small enough to read, but complete enough to demonstrate the correctness and performance questions that real microarchitecture simulators must answer.
 
-Many small CPU projects execute one instruction at a time or model a five-stage in-order pipeline. This project models the structures that make modern cores interesting:
-
-- configurable frontend/backend widths
-- physical register file and rename table
-- free physical register list
-- reorder buffer with in-order commit
-- issue queue with wakeup/select behavior
-- load/store queue with store-to-load forwarding constraints
-- direct-mapped L1 instruction and data caches
-- static and dynamic branch predictors
-- multi-cycle RV32M multiply/divide operations
-- CSV timeline output for pipeline visualization
-- occupancy statistics for ROB, IQ, LSQ, and physical registers
-
-## Architecture Diagram
+## Architecture
 
 ```text
-Fetch -> Decode -> Rename -> Dispatch -> Issue Queue -> Functional Units -> Writeback -> ROB Commit
-                             |                              |
-                             v                              v
-                        Rename Table                 Physical Reg File
-                             |
-                             v
-                            ROB
-
-L1 I-cache feeds fetch. L1 D-cache sits behind the load/store unit.
-The branch predictor redirects fetch, and branch recovery flushes wrong-path work.
+Fetch -> Decode -> Rename -> Dispatch -> Issue -> Execute -> Writeback -> Commit
+                    |            |          |          |             |
+                    v            v          v          v             v
+              Rename Table      ROB        IQ         FUs        Arch State
+                    |            |          |
+                    v            v          v
+            Physical Regs       LSQ      Branch Predictor
 ```
 
-## Out-of-Order Execution Flow
+The simulator models an RV32I-style assembly subset with RV32M multiply/divide operations where implemented. The out-of-order backend keeps precise architectural state by committing through the ROB in program order.
 
-The simulator keeps the original 8-stage macro-pipeline:
+## Key Features
 
-1. **Instruction Fetch**: fetches from the program stream through the L1 I-cache.
-2. **Decode**: moves parsed RV32I/RV32M instructions into frontend queues.
-3. **Rename**: maps architectural registers to physical registers.
-4. **Dispatch**: allocates ROB, issue queue, and LSQ entries.
-5. **Issue / Select**: chooses ready instructions for available functional units.
-6. **Execute**: runs ALU, branch, memory, MUL, and DIV operations with latency.
-7. **Writeback**: writes results to the physical register file.
-8. **Commit / Retire**: retires ready instructions in program order.
+- 8-stage macro-pipeline: fetch, decode, rename, dispatch, issue, execute, writeback, commit
+- Superscalar fetch/decode/rename/dispatch/issue widths configured through JSON
+- Register renaming with a physical register file and free list
+- Reorder buffer with in-order retirement and branch recovery snapshots
+- Issue queue and multiple functional units
+- Load/store queue with store-to-load forwarding and in-order store commit
+- Direct-mapped I-cache and D-cache latency modeling
+- Branch predictor and mispredict flush handling
+- Cycle-level stats, CPI/stall breakdowns, and CSV tracing
+- In-order reference CPU for differential testing
+- Invariant checker for ROB, IQ, LSQ, rename, free-list, and x0 rules
+- Random program generation and randomized differential testing
+- Local static HTML pipeline timeline viewer
+- Benchmark and report scripts
 
-Independent instructions can issue around older cache misses or long-latency multiply/divide work when their operands are ready and a suitable functional unit is free.
+## Why It Matters
 
-## Register Renaming Example
+Out-of-order execution is one of the central ideas behind high-performance CPUs. This project shows how speculative execution can improve instruction-level parallelism while preserving precise architectural results through register renaming and ROB commit. The verification layer demonstrates how to test a timing model against a simpler architectural reference model.
 
-```asm
-ADDI x1, x0, 1   # x1 -> p32
-ADD  x2, x1, x1  # reads p32, x2 -> p33
-ADDI x1, x0, 9   # x1 -> p34, older p32 still feeds x2
-```
-
-The rename table removes false dependencies by giving each write a fresh physical register. `x0` is permanently mapped to physical register `p0`, always reads as zero, and ignores writes.
-
-## ROB Example
-
-The reorder buffer preserves precise architectural state. Instructions may finish out of order, but commit happens from the ROB head only:
-
-```text
-ROB0: LW   x1, 0(x0)   waiting on D-cache miss
-ROB1: ADDI x2, x0, 7   ready, cannot commit before ROB0
-ROB2: ADDI x3, x0, 8   ready, cannot commit before ROB0
-```
-
-Once ROB0 completes, the commit stage can retire multiple ready entries in order.
-
-## Issue Queue And Wakeup/Select
-
-The issue queue stores renamed instructions with source physical registers. Each cycle, ready entries are selected for:
-
-- 2 integer ALUs
-- 1 branch unit
-- 1 load/store unit
-
-The issue width is configurable, so the model can demonstrate narrow debug cores or wider superscalar issue.
-
-## Load/Store Queue Behavior
-
-The LSQ tracks memory operations until retirement. Stores write memory only at commit. Loads can issue when all older store addresses are known; if an older store has the same address and its data is ready, the load forwards from that store instead of reading memory. D-cache misses hold the load/store unit for the configured miss latency while independent ALU work can continue.
-
-## Branch Prediction And Recovery
-
-Supported predictors:
-
-- `static_not_taken`
-- `static_taken`
-- `one_bit`
-- `two_bit`
-- `btb`
-- `return_stack`
-
-The simulator tracks total branch predictions, correct predictions, mispredictions, accuracy, and estimated misprediction penalty cycles. A misprediction flushes younger ROB, issue queue, LSQ, and frontend work, restores the rename table from a branch snapshot, rebuilds the free-list, and redirects fetch.
-
-## Cache Model
-
-The L1 instruction cache and L1 data cache are direct-mapped. They support configurable size, line size, hit latency, and miss latency.
-
-Tracked cache stats:
-
-- I-cache hits and misses
-- I-cache hit rate
-- D-cache hits and misses
-- D-cache hit rate
-- fetch miss stalls
-- load/store miss stalls
-
-## Functional Unit Latency Model
-
-Default latencies:
-
-- integer ALU: 1 cycle
-- branch: 1 cycle
-- load/store: cache dependent
-- `MUL` / `MULH`: 3 cycles
-- `DIV` / `REM`: 12 cycles
-
-Latency values are configurable from the config files.
-
-## Configuration
-
-Example:
+## Build
 
 ```bash
-./riscv_ooo_sim --config configs/default_2wide.json examples/arithmetic_program.txt
+cmake -S . -B build -DENABLE_TESTS=ON -DENABLE_WARNINGS=ON
+cmake --build build
 ```
 
-Provided configs:
+Useful CMake options:
 
-- `configs/default_2wide.json`
-- `configs/wide_4issue.json`
-- `configs/tiny_debug.json`
+- `ENABLE_WARNINGS=ON`
+- `ENABLE_ASAN=ON` on non-MSVC compilers
+- `ENABLE_TRACE=ON`
+- `ENABLE_TESTS=ON`
 
-The parser supports a small flat JSON-like format and key/value style entries without external dependencies.
-
-## Timeline CSV Output
+## Run
 
 ```bash
-./riscv_ooo_sim --timeline examples/dependency_program.txt
+./build/riscv_ooo_sim examples/arithmetic_program.txt
+./build/riscv_ooo_sim --trace examples/dependency_program.txt
+./build/riscv_ooo_sim --timeline examples/dependency_program.txt
+./build/riscv_ooo_sim --version
 ```
 
-This writes:
+On Windows with a multi-config generator, the executable may be under `build/Debug/riscv_ooo_sim.exe`.
 
-```text
-outputs/pipeline_timeline.csv
-```
-
-CSV columns:
-
-```text
-cycle,instruction_id,pc,instruction,stage,event,rob_index,physical_dest
-```
-
-Events include `FETCH`, `DECODE`, `RENAME`, `DISPATCH`, `ISSUE`, `EXECUTE_START`, `EXECUTE_DONE`, `WRITEBACK`, `COMMIT`, and `FLUSHED`.
-
-## Occupancy Stats CSV
+## Verification
 
 ```bash
-./riscv_ooo_sim --stats-csv outputs/stats.csv examples/arithmetic_program.txt
+./build/riscv_ooo_sim --diff examples/arithmetic_program.txt
+./build/riscv_ooo_sim --check-invariants examples/dependency_program.txt
+./build/riscv_ooo_sim --dump-on-fail --diff examples/branch_program.txt
+python tools/run_random_diff_tests.py --count 20 --instructions 100
 ```
 
-CSV columns:
+`--diff` runs the out-of-order simulator and the in-order reference CPU on the same program, then compares architectural registers, touched memory words, final PC, and retired instruction counts.
 
-```text
-cycle,rob_occupancy,iq_occupancy,lsq_occupancy,free_phys_regs,committed,inflight
-```
-
-## Benchmark Suite
-
-Benchmarks live in `benchmarks/`:
-
-- `dependency_chain.riscv`: demonstrates RAW dependency bottlenecks
-- `independent_ilp.riscv`: demonstrates independent instruction-level parallelism
-- `branch_loop.riscv`: demonstrates predictor warmup on loop branches
-- `load_use_latency.riscv`: demonstrates load-use latency and independent work
-- `memory_stream.riscv`: demonstrates D-cache behavior
-- `multiply_latency.riscv`: demonstrates RV32M multi-cycle latency
-
-Example:
+## Tests
 
 ```bash
-./riscv_ooo_sim --config configs/wide_4issue.json --stats-csv outputs/ilp_stats.csv benchmarks/independent_ilp.riscv
+ctest --test-dir build --output-on-failure
 ```
 
-## Example Performance Stats
+The suite covers arithmetic, dependency scheduling, load/store behavior, branches, caches, RV32M operations, x0 behavior, reference execution, differential testing, invariant checking, branch flush correctness, precise commit, memory ordering, and random-program smoke coverage.
 
-A normal run prints a compact summary:
-
-```text
-cycles=28 retired=8 ipc=0.29 branch_accuracy=75.00% branch_mispredicts=1 icache_hits=7 icache_misses=2 dcache_hits=1 dcache_misses=1 fetch_miss_stalls=8 load_miss_stalls=7 rob=0/6 iq=0/4 lsq=0/1
-```
-
-The exact values depend on the selected config, cache sizes, and benchmark.
-
-## Build Instructions
+## Benchmarks
 
 ```bash
-mkdir build
-cd build
-cmake ..
-cmake --build .
+python tools/run_cpu_benchmarks.py
+python tools/plot_cpu_results.py
 ```
 
-## Run Instructions
+Benchmark CSV output is written to `outputs/cpu_benchmark_results.csv`. Timeline CSV files are written under `outputs/timelines/`.
+
+## Visualization
 
 ```bash
-./riscv_ooo_sim examples/arithmetic_program.txt
-./riscv_ooo_sim --trace examples/arithmetic_program.txt
-./riscv_ooo_sim --config configs/default_2wide.json examples/arithmetic_program.txt
-./riscv_ooo_sim --timeline examples/dependency_program.txt
-./riscv_ooo_sim --stats-csv outputs/stats.csv benchmarks/branch_loop.riscv
+./build/riscv_ooo_sim --timeline --timeline-csv outputs/cpu_pipeline_timeline.csv examples/dependency_program.txt
 ```
 
-On Windows with a multi-config generator, the executable may be under `build/Debug/` or `build/Release/`.
+Open `viewer/cpu_timeline_viewer.html` in a browser and select the generated CSV. The viewer works locally with no external web dependencies.
 
-## Test Instructions
+## Project Structure
 
-```bash
-cd build
-ctest --output-on-failure
-```
+- `include/`, `src/`: simulator core
+- `tests/`: assert-based CTest programs
+- `examples/`: small hand-written programs
+- `benchmarks/`: architecture-focused benchmark programs
+- `tools/`: random testing, benchmark, and plotting scripts
+- `viewer/`: static pipeline timeline viewer
+- `docs/`: architecture, verification, benchmarks, diagrams, limitations
+- `results/`: generated example outputs
 
-The test suite covers arithmetic, dependencies, out-of-order execution, loads/stores, branch recovery, `x0`, branch predictor behavior, cache counters, RV32M instructions, timeline generation, and config parsing.
+## Limitations
 
-## Supported Instructions
-
-RV32I subset:
-
-- `ADD`, `SUB`
-- `AND`, `OR`, `XOR`
-- `SLL`, `SRL`, `SRA`
-- `ADDI`, `ANDI`, `ORI`, `XORI`
-- `LW`, `SW`
-- `BEQ`, `BNE`, `BLT`, `BGE`
-- `JAL`, `JALR`
-- `LUI`, `AUIPC`
-- `NOP`
-
-RV32M subset:
-
-- `MUL`
-- `MULH`
-- `DIV`
-- `REM`
+This is a focused educational simulator, not a full RISC-V system emulator. It models a useful RV32I/RV32M subset, sparse word-oriented memory behavior, simplified cache timing, and an intentionally compact branch predictor and LSQ. See `docs/limitations.md` for the current boundary.
 
 ## Future Work
 
-- set-associative cache model
-- non-blocking cache with MSHRs
-- richer memory consistency experiments
-- ELF loader
-- configurable functional unit counts
-- tournament branch predictor
-- Tomasulo-style visualization
-- web-based pipeline viewer backed by the timeline CSV
+- Add more RV32I load/store widths and system instructions
+- Expand predictor policies and recovery statistics
+- Add richer memory dependence prediction
+- Add golden trace comparison at every commit
+- Export richer JSON traces for external visualization
+- Add larger benchmark kernels and perf regression thresholds
+
+## Resume / Interview Talking Points
+
+- Built a C++17 RISC-V out-of-order superscalar CPU simulator modeling register renaming, ROB commit, issue queues, branch recovery, cache stalls, and cycle-level pipeline behavior.
+- Added differential verification against an in-order reference model, invariant checking, randomized test generation, benchmark automation, and timeline visualization outputs.
+
+## What I Learned
+
+This project reinforced how register renaming removes false dependencies, how ROB commit preserves precise state, how out-of-order issue interacts with readiness and functional-unit latency, how branch recovery must restore speculative rename state, how cache and resource stalls shape CPI, and how differential testing catches correctness bugs that pure performance traces miss.

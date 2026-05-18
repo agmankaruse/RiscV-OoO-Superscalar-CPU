@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CPU Pipeline Timeline Viewer</title>
+  <link rel="stylesheet" href="cpu_timeline_viewer.css">
+</head>
+<body>
+  <header>
+    <h1>CPU Pipeline Timeline</h1>
+    <div class="controls">
+      <input id="csvFile" type="file" accept=".csv,text/csv">
+      <input id="instructionFilter" type="search" placeholder="Instruction ID">
+      <select id="stageFilter">
+        <option value="">All stages</option>
+      </select>
+    </div>
+  </header>
+  <main>
+    <div id="summary"></div>
+    <div id="timeline" class="timeline"></div>
+  </main>
+  <script src="cpu_timeline_viewer.js"></script>
+</body>
+</html>

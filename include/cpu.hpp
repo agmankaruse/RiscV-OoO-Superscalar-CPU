@@ -20,6 +20,8 @@
 
 namespace ooo {
 
+class InvariantChecker;
+
 class CPU {
 public:
     explicit CPU(const CpuConfig& config = CpuConfig{});
@@ -38,11 +40,21 @@ public:
     bool halted() const;
 
     std::uint32_t readArchitecturalRegister(int architecturalRegister) const;
+    std::size_t finalPc() const;
     Memory& memory();
     const Memory& memory() const;
     const Stats& stats() const;
 
+    std::string dumpROB() const;
+    std::string dumpIssueQueue() const;
+    std::string dumpRenameTable() const;
+    std::string dumpPhysicalRegisters() const;
+    std::string dumpLSQ() const;
+    std::string dumpPipelineState() const;
+
 private:
+    friend class InvariantChecker;
+
     void writebackStage();
     void commitStage();
     void issueStage();
@@ -62,7 +74,13 @@ private:
                         const std::string& stage,
                         const std::string& event,
                         std::uint64_t robId = 0,
-                        int physicalDestination = -1);
+                        int physicalDestination = -1,
+                        int issueQueueIndex = -1,
+                        int loadStoreQueueIndex = -1,
+                        int architecturalDestination = -1,
+                        int oldPhysicalDestination = -1,
+                        const std::string& branchPrediction = "",
+                        const std::string& cacheResult = "");
     void recordStatsCsvRow();
     void trace(const std::string& message) const;
 

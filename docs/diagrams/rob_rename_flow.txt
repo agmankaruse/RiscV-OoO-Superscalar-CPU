@@ -1,0 +1,16 @@
+Decode instruction
+       |
+       v
+Rename table: xN -> old physical register
+       |
+       v
+Allocate new physical register from free list
+       |
+       v
+ROB entry records arch dest, new phys dest, old phys dest
+       |
+       v
+Execute writes new physical register and marks ROB ready
+       |
+       v
+Commit updates committed map and releases unused physical registers
