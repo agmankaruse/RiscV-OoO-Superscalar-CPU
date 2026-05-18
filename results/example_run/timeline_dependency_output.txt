@@ -1,0 +1,4 @@
+cycles=17 retired=6 ipc=0.35 cpi=2.83 branch_accuracy=0.00% branch_mispredicts=0 icache_hits=6 icache_misses=1 icache_hit_rate=85.71% dcache_hits=0 dcache_misses=0 dcache_hit_rate=0.00% fetch_miss_stalls=8 load_miss_stalls=0 frontend_stalls=8 backend_stalls=0 branch_mispredict_stalls=0 cache_miss_stalls=14 rob_full_stalls=0 iq_full_stalls=0 lsq_full_stalls=0 physical_register_stalls=0 avg_rob=0.82 avg_iq=0.47 avg_lsq=0.00 rob=0/4 iq=0/3 lsq=0/0
+cpi=2.83 stalls_total=22 frontend=8 backend=0 branch_mispredict=0 cache_miss=14 rob_full=0 iq_full=0 lsq_full=0 physical_register=0
+timeline_csv=outputs\cpu_pipeline_timeline.csv
+architectural registers: x0=0 x1=9 x2=2 x3=5 x4=7

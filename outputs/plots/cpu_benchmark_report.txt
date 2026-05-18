@@ -1,0 +1,8 @@
+CPU benchmark summary
+
+branch_loop: cycles=40 retired=18 IPC=0.45 branch_accuracy=20.00 cache_stalls=14
+dependency_chain: cycles=21 retired=8 IPC=0.38 branch_accuracy=0.00 cache_stalls=14
+independent_ilp: cycles=18 retired=8 IPC=0.44 branch_accuracy=0.00 cache_stalls=14
+load_use_latency: cycles=24 retired=6 IPC=0.25 branch_accuracy=0.00 cache_stalls=21
+memory_stream: cycles=41 retired=9 IPC=0.22 branch_accuracy=0.00 cache_stalls=49
+multiply_latency: cycles=30 retired=6 IPC=0.20 branch_accuracy=0.00 cache_stalls=14

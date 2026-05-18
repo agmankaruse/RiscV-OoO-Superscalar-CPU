@@ -103,6 +103,10 @@ bool LoadStoreQueue::empty() const {
     return entries_.empty();
 }
 
+const std::vector<LoadStoreEntry>& LoadStoreQueue::entries() const {
+    return entries_;
+}
+
 LoadStoreEntry* LoadStoreQueue::find(std::uint64_t robId) {
     for (auto& entry : entries_) {
         if (entry.robId == robId) {

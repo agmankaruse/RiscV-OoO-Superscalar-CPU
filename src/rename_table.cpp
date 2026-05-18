@@ -45,6 +45,14 @@ std::size_t RenameTable::freeCount() const {
     return freeList_.size();
 }
 
+int RenameTable::physicalRegisterCount() const {
+    return physicalRegisterCount_;
+}
+
+std::vector<int> RenameTable::freeListSnapshot() const {
+    return {freeList_.begin(), freeList_.end()};
+}
+
 RenameResult RenameTable::allocateDestination(int architecturalRegister, PhysicalRegisterFile& registerFile) {
     RenameResult result;
     if (architecturalRegister <= 0) {

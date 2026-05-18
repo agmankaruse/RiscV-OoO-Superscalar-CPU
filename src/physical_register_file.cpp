@@ -57,4 +57,12 @@ int PhysicalRegisterFile::size() const {
     return static_cast<int>(values_.size());
 }
 
+const std::vector<std::uint32_t>& PhysicalRegisterFile::values() const {
+    return values_;
+}
+
+std::vector<bool> PhysicalRegisterFile::readiness() const {
+    return ready_;
+}
+
 } // namespace ooo

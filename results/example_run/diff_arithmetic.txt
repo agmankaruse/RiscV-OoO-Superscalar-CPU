@@ -1,0 +1,1 @@
+PASS diff program=examples\arithmetic_program.txt cycles=18 ooo_final_pc=6 reference_final_pc=6 ooo_retired=6 reference_retired=6

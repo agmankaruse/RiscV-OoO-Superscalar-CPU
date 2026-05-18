@@ -1,0 +1,107 @@
+:root {
+  color-scheme: light dark;
+  font-family: Inter, Segoe UI, Arial, sans-serif;
+  --bg: #f7f8fa;
+  --fg: #17202a;
+  --muted: #657080;
+  --line: #d8dee8;
+  --fetch: #cfe8ff;
+  --rename: #e4dcff;
+  --issue: #ffe8bf;
+  --execute: #d7f5df;
+  --commit: #d9ead3;
+  --flush: #ffd6d6;
+  --stall: #ffe1ad;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+header {
+  padding: 20px 24px 12px;
+  border-bottom: 1px solid var(--line);
+  background: #ffffff;
+}
+
+h1 {
+  margin: 0 0 14px;
+  font-size: 22px;
+  font-weight: 650;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+input,
+select {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 0 10px;
+  background: #ffffff;
+  color: var(--fg);
+}
+
+main {
+  padding: 16px 24px 24px;
+}
+
+#summary {
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+
+.timeline {
+  overflow: auto;
+  border: 1px solid var(--line);
+  background: #ffffff;
+  max-height: calc(100vh - 150px);
+}
+
+table {
+  border-collapse: collapse;
+  font-size: 12px;
+  min-width: 100%;
+}
+
+th,
+td {
+  border: 1px solid var(--line);
+  padding: 6px 8px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+th:first-child,
+td:first-child {
+  position: sticky;
+  left: 0;
+  background: #ffffff;
+  text-align: left;
+  z-index: 1;
+}
+
+.event {
+  border-radius: 4px;
+  padding: 3px 6px;
+  display: inline-block;
+  min-width: 54px;
+}
+
+.FETCH { background: var(--fetch); }
+.DECODE,
+.RENAME,
+.DISPATCH { background: var(--rename); }
+.ISSUE,
+.WRITEBACK { background: var(--issue); }
+.EXECUTE_START,
+.EXECUTE_DONE { background: var(--execute); }
+.COMMIT { background: var(--commit); }
+.FLUSH { background: var(--flush); }
+.STALL { background: var(--stall); }

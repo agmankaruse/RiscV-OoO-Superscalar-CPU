@@ -20,6 +20,8 @@ public:
     void setReady(int physicalRegister, bool ready);
 
     int size() const;
+    const std::vector<std::uint32_t>& values() const;
+    std::vector<bool> readiness() const;
 
 private:
     std::vector<std::uint32_t> values_;

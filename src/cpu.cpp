@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
 #include <set>
 #include <sstream>
@@ -91,7 +92,9 @@ void CPU::setTrace(bool enabled) {
 
 void CPU::enableTimelineCsv(const std::string& path) {
     timelineCsvPath_ = path;
-    configureOutputFile(path, "cycle,instruction_id,pc,instruction,stage,event,rob_index,physical_dest\n");
+    configureOutputFile(path,
+                        "cycle,instruction_id,pc,instruction,stage,event,rob_index,iq_index,lsq_index,"
+                        "arch_dest,phys_dest,old_phys_dest,branch_prediction,cache_result\n");
 }
 
 void CPU::enableStatsCsv(const std::string& path) {
@@ -142,6 +145,10 @@ std::uint32_t CPU::readArchitecturalRegister(int architecturalRegister) const {
     return registerFile_.read(renameTable_.committedMapping(architecturalRegister));
 }
 
+std::size_t CPU::finalPc() const {
+    return fetchPc_;
+}
+
 Memory& CPU::memory() {
     return memory_;
 }
@@ -152,6 +159,92 @@ const Memory& CPU::memory() const {
 
 const Stats& CPU::stats() const {
     return stats_;
+}
+
+std::string CPU::dumpROB() const {
+    std::ostringstream out;
+    out << "ROB size=" << reorderBuffer_.size() << "/" << reorderBuffer_.capacity() << '\n';
+    for (const auto& entry : reorderBuffer_.entries()) {
+        out << "  id=" << entry.id
+            << " ready=" << entry.ready
+            << " instr=\"" << formatInstruction(entry.instruction) << "\""
+            << " arch_dest=x" << entry.architecturalDestination
+            << " phys_dest=p" << entry.physicalDestination
+            << " old=p" << entry.oldPhysicalDestination
+            << " value=" << entry.value
+            << " predicted_next_pc=" << entry.predictedNextPc << '\n';
+    }
+    return out.str();
+}
+
+std::string CPU::dumpIssueQueue() const {
+    std::ostringstream out;
+    out << "IssueQueue size=" << issueQueue_.size() << "/" << issueQueue_.capacity() << '\n';
+    for (const auto& entry : issueQueue_.entries()) {
+        out << "  rob=" << entry.robId
+            << " instr=\"" << formatInstruction(entry.instruction) << "\""
+            << " src1=p" << entry.src1Physical << " ready=" << registerFile_.isReady(entry.src1Physical)
+            << " src2=p" << entry.src2Physical << " ready=" << registerFile_.isReady(entry.src2Physical)
+            << " dest=p" << entry.destPhysical << '\n';
+    }
+    return out.str();
+}
+
+std::string CPU::dumpRenameTable() const {
+    std::ostringstream out;
+    out << "RenameTable current/committed\n";
+    for (int arch = 0; arch < RenameTable::kArchitecturalRegisters; ++arch) {
+        out << "  x" << std::setw(2) << arch
+            << " current=p" << std::setw(2) << renameTable_.currentMapping(arch)
+            << " committed=p" << std::setw(2) << renameTable_.committedMapping(arch) << '\n';
+    }
+    out << "FreeList";
+    for (const auto phys : renameTable_.freeListSnapshot()) {
+        out << " p" << phys;
+    }
+    out << '\n';
+    return out.str();
+}
+
+std::string CPU::dumpPhysicalRegisters() const {
+    std::ostringstream out;
+    out << "PhysicalRegisters count=" << registerFile_.size() << '\n';
+    const auto readiness = registerFile_.readiness();
+    for (int phys = 0; phys < registerFile_.size(); ++phys) {
+        const auto value = registerFile_.read(phys);
+        if (phys == 0 || value != 0 || !readiness.at(static_cast<std::size_t>(phys))) {
+            out << "  p" << std::setw(2) << phys
+                << " value=" << value
+                << " ready=" << readiness.at(static_cast<std::size_t>(phys)) << '\n';
+        }
+    }
+    return out.str();
+}
+
+std::string CPU::dumpLSQ() const {
+    std::ostringstream out;
+    out << "LSQ size=" << loadStoreQueue_.size() << "/" << loadStoreQueue_.capacity() << '\n';
+    for (const auto& entry : loadStoreQueue_.entries()) {
+        out << "  rob=" << entry.robId
+            << " type=" << (entry.isLoad ? "load" : "store")
+            << " address_ready=" << entry.addressReady
+            << " value_ready=" << entry.valueReady
+            << " address=" << entry.address
+            << " value=" << entry.value << '\n';
+    }
+    return out.str();
+}
+
+std::string CPU::dumpPipelineState() const {
+    std::ostringstream out;
+    out << "PipelineState cycle=" << stats_.cycles
+        << " fetch_pc=" << fetchPc_
+        << " fetch_queue=" << pipeline_.fetch.size()
+        << " decode_queue=" << pipeline_.decode.size()
+        << " rename_queue=" << pipeline_.rename.size()
+        << " halted=" << halted() << '\n';
+    out << dumpROB() << dumpIssueQueue() << dumpRenameTable() << dumpPhysicalRegisters() << dumpLSQ();
+    return out.str();
 }
 
 void CPU::writebackStage() {
@@ -246,7 +339,9 @@ void CPU::issueStage() {
                     ++stats_.dataCacheHits;
                 } else {
                     ++stats_.dataCacheMisses;
-                    stats_.loadMissStalls += static_cast<std::uint64_t>(std::max(0, cache.latencyCycles - 1));
+                    const auto penalty = static_cast<std::uint64_t>(std::max(0, cache.latencyCycles - 1));
+                    stats_.loadMissStalls += penalty;
+                    stats_.cacheMissStallCycles += penalty;
                 }
             }
         } else if (entry.instruction.isStore()) {
@@ -256,7 +351,9 @@ void CPU::issueStage() {
                 ++stats_.dataCacheHits;
             } else {
                 ++stats_.dataCacheMisses;
-                stats_.loadMissStalls += static_cast<std::uint64_t>(std::max(0, cache.latencyCycles - 1));
+                const auto penalty = static_cast<std::uint64_t>(std::max(0, cache.latencyCycles - 1));
+                stats_.loadMissStalls += penalty;
+                stats_.cacheMissStallCycles += penalty;
             }
         }
         selectedUnit->issue(operation);
@@ -276,10 +373,28 @@ void CPU::dispatchStage() {
     int dispatched = 0;
     while (dispatched < config_.dispatchWidth && !pipeline_.rename.empty()) {
         const auto& renamed = pipeline_.rename.front();
-        if (!reorderBuffer_.canAllocate() || !issueQueue_.canAllocate()) {
+        if (!reorderBuffer_.canAllocate()) {
+            ++stats_.backendStallCycles;
+            ++stats_.robFullStallCycles;
+            recordTimeline(renamed.instruction, "Dispatch", "STALL", 0, renamed.physicalDestination,
+                           -1, -1, renamed.architecturalDestination, renamed.oldPhysicalDestination,
+                           "", "ROB_FULL");
+            break;
+        }
+        if (!issueQueue_.canAllocate()) {
+            ++stats_.backendStallCycles;
+            ++stats_.iqFullStallCycles;
+            recordTimeline(renamed.instruction, "Dispatch", "STALL", 0, renamed.physicalDestination,
+                           -1, -1, renamed.architecturalDestination, renamed.oldPhysicalDestination,
+                           "", "IQ_FULL");
             break;
         }
         if (renamed.instruction.isMemory() && !loadStoreQueue_.canAllocate()) {
+            ++stats_.backendStallCycles;
+            ++stats_.lsqFullStallCycles;
+            recordTimeline(renamed.instruction, "Dispatch", "STALL", 0, renamed.physicalDestination,
+                           -1, -1, renamed.architecturalDestination, renamed.oldPhysicalDestination,
+                           "", "LSQ_FULL");
             break;
         }
 
@@ -311,7 +426,8 @@ void CPU::dispatchStage() {
         });
 
         trace("dispatch ROB" + std::to_string(robId) + " " + formatInstruction(renamed.instruction));
-        recordTimeline(renamed.instruction, "Dispatch", "DISPATCH", robId, renamed.physicalDestination);
+        recordTimeline(renamed.instruction, "Dispatch", "DISPATCH", robId, renamed.physicalDestination,
+                       -1, -1, renamed.architecturalDestination, renamed.oldPhysicalDestination);
         pipeline_.rename.pop_front();
         ++dispatched;
     }
@@ -322,6 +438,10 @@ void CPU::renameStage() {
     while (renamedCount < config_.renameWidth && !pipeline_.decode.empty() && pipeline_.renameCanAccept()) {
         const auto instruction = pipeline_.decode.front();
         if (instruction.writesRegister() && !renameTable_.canAllocate()) {
+            ++stats_.backendStallCycles;
+            ++stats_.physicalRegisterStallCycles;
+            recordTimeline(instruction, "Rename", "STALL", 0, -1, -1, -1, instruction.rd, -1,
+                           "", "PHYS_REG_EMPTY");
             break;
         }
 
@@ -349,7 +469,9 @@ void CPU::renameStage() {
         pipeline_.decode.pop_front();
         pipeline_.rename.push_back(renamed);
         trace("rename " + formatInstruction(instruction));
-        recordTimeline(instruction, "Rename", "RENAME", 0, renamed.physicalDestination);
+        recordTimeline(instruction, "Rename", "RENAME", 0, renamed.physicalDestination,
+                       -1, -1, renamed.architecturalDestination, renamed.oldPhysicalDestination,
+                       instruction.isControl() ? std::to_string(renamed.predictedNextPc) : "");
         ++renamedCount;
     }
 }
@@ -370,6 +492,8 @@ void CPU::fetchStage() {
     if (fetchStallCycles_ > 0) {
         --fetchStallCycles_;
         ++stats_.fetchMissStalls;
+        ++stats_.frontendStallCycles;
+        ++stats_.cacheMissStallCycles;
         trace("fetch stalled by I-cache miss");
         return;
     }
@@ -383,6 +507,8 @@ void CPU::fetchStage() {
             ++stats_.instructionCacheMisses;
             fetchStallCycles_ = std::max(0, cache.latencyCycles - 1);
             ++stats_.fetchMissStalls;
+            ++stats_.frontendStallCycles;
+            stats_.cacheMissStallCycles += static_cast<std::uint64_t>(std::max(0, cache.latencyCycles - 1));
             trace("I-cache miss at pc=" + std::to_string(fetchPc_));
             return;
         }
@@ -392,7 +518,9 @@ void CPU::fetchStage() {
         instruction.predictedNextPc = branchPredictor_.predictNextPc(instruction);
         pipeline_.fetch.push_back(instruction);
         trace("fetch pc=" + std::to_string(fetchPc_) + " " + formatInstruction(instruction));
-        recordTimeline(instruction, "Instruction Fetch", "FETCH");
+        recordTimeline(instruction, "Instruction Fetch", "FETCH", 0, -1, -1, -1, -1, -1,
+                       instruction.isControl() ? std::to_string(instruction.predictedNextPc) : "",
+                       cache.hit ? "I_HIT" : "I_MISS");
 
         const auto sequential = static_cast<int>(instruction.pc) + 1;
         if (instruction.isControl() && instruction.predictedNextPc != sequential) {
@@ -608,6 +736,7 @@ void CPU::completeOperation(const IssuedOperation& operation) {
         if (mispredicted) {
             ++stats_.branchMispredicts;
             stats_.mispredictionPenaltyCycles += static_cast<std::uint64_t>(config_.mispredictPenaltyCycles);
+            stats_.branchMispredictStallCycles += static_cast<std::uint64_t>(config_.mispredictPenaltyCycles);
             trace("branch recovery ROB" + std::to_string(operation.robId) +
                   " redirect pc=" + std::to_string(actualNextPc));
             recoverFromBranch(operation.robId, actualNextPc);
@@ -625,20 +754,20 @@ void CPU::recoverFromBranch(std::uint64_t robId, int actualNextPc) {
     const auto renameSnapshot = branch->renameSnapshot;
 
     for (const auto& instruction : pipeline_.fetch) {
-        recordTimeline(instruction, "Flush", "FLUSHED");
+        recordTimeline(instruction, "Flush", "FLUSH");
     }
     for (const auto& instruction : pipeline_.decode) {
-        recordTimeline(instruction, "Flush", "FLUSHED");
+        recordTimeline(instruction, "Flush", "FLUSH");
     }
     for (const auto& renamed : pipeline_.rename) {
-        recordTimeline(renamed.instruction, "Flush", "FLUSHED", 0, renamed.physicalDestination);
+        recordTimeline(renamed.instruction, "Flush", "FLUSH", 0, renamed.physicalDestination);
     }
     pipeline_.clear();
     issueQueue_.flushYoungerThan(robId);
     loadStoreQueue_.flushYoungerThan(robId);
     const auto flushed = reorderBuffer_.flushYoungerThan(robId);
     for (const auto& entry : flushed) {
-        recordTimeline(entry.instruction, "Flush", "FLUSHED", entry.id, entry.physicalDestination);
+        recordTimeline(entry.instruction, "Flush", "FLUSH", entry.id, entry.physicalDestination);
     }
     renameTable_.restore(renameSnapshot);
     rebuildFreeListAfterRecovery();
@@ -675,7 +804,13 @@ void CPU::recordTimeline(const Instruction& instruction,
                          const std::string& stage,
                          const std::string& event,
                          std::uint64_t robId,
-                         int physicalDestination) {
+                         int physicalDestination,
+                         int issueQueueIndex,
+                         int loadStoreQueueIndex,
+                         int architecturalDestination,
+                         int oldPhysicalDestination,
+                         const std::string& branchPrediction,
+                         const std::string& cacheResult) {
     if (timelineCsvPath_.empty()) {
         return;
     }
@@ -693,7 +828,13 @@ void CPU::recordTimeline(const Instruction& instruction,
            << clean(stage) << ','
            << event << ','
            << robId << ','
-           << physicalDestination << '\n';
+           << issueQueueIndex << ','
+           << loadStoreQueueIndex << ','
+           << (architecturalDestination >= 0 ? architecturalDestination : (instruction.writesRegister() ? instruction.rd : -1)) << ','
+           << physicalDestination << ','
+           << oldPhysicalDestination << ','
+           << clean(branchPrediction) << ','
+           << clean(cacheResult) << '\n';
 }
 
 void CPU::recordStatsCsvRow() {

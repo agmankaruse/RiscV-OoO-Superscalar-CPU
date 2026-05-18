@@ -1,5 +1,8 @@
 #include "memory.hpp"
 
+#include <algorithm>
+#include <set>
+
 namespace ooo {
 
 std::uint8_t Memory::readByte(std::uint32_t address) const {
@@ -28,6 +31,21 @@ void Memory::writeWord(std::uint32_t address, std::uint32_t value) {
     writeByte(address + 1, static_cast<std::uint8_t>((value >> 8) & 0xffu));
     writeByte(address + 2, static_cast<std::uint8_t>((value >> 16) & 0xffu));
     writeByte(address + 3, static_cast<std::uint8_t>((value >> 24) & 0xffu));
+}
+
+std::vector<std::pair<std::uint32_t, std::uint32_t>> Memory::words() const {
+    std::set<std::uint32_t> wordAddresses;
+    for (const auto& [address, value] : bytes_) {
+        (void)value;
+        wordAddresses.insert(address & ~0x3u);
+    }
+
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> snapshot;
+    snapshot.reserve(wordAddresses.size());
+    for (const auto address : wordAddresses) {
+        snapshot.push_back({address, readWord(address)});
+    }
+    return snapshot;
 }
 
 void Memory::clear() {

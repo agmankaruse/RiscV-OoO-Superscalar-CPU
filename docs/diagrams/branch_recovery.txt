@@ -1,0 +1,17 @@
+Branch renamed
+     |
+     v
+Save rename snapshot
+     |
+     v
+Fetch predicted path
+     |
+     v
+Branch executes and computes actual next PC
+     |
+     +-- prediction correct --> continue
+     |
+     +-- mispredict ---------> flush younger fetch/decode/rename/ROB/IQ/LSQ entries
+                              restore rename snapshot
+                              rebuild physical register free list
+                              redirect fetch PC

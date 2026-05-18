@@ -44,6 +44,7 @@ public:
     std::size_t size() const;
     std::size_t capacity() const;
     bool empty() const;
+    const std::vector<LoadStoreEntry>& entries() const;
 
 private:
     LoadStoreEntry* find(std::uint64_t robId);
